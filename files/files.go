@@ -4,7 +4,7 @@ import (
     "log"
     "os"
     "sort"
-    // "github.com/fatih/color"
+    "strings"
 )
 
 func contains(sli []string, element string) bool {
@@ -25,7 +25,7 @@ func addAll(sli1 []string, sli2 []string) []string {
     return newSli
 }
 
-func separateFilesAndFolders(path string) ([]string, []string) {
+func separateFilesAndFolders(path string, showHidden bool) ([]string, []string) {
     directory, err := os.ReadDir(path)
 
     if err != nil {
@@ -35,19 +35,20 @@ func separateFilesAndFolders(path string) ([]string, []string) {
     var folders []string
 
     for _, file := range directory {
+        if strings.HasPrefix(file.Name(), ".") && !showHidden { continue }
+
         if file.IsDir() {
-            // c := color.New(color.FgBlue)
-            // cFunc := c.SprintFunc()
             folders = append(folders, file.Name())
         } else {
             files = append(files, file.Name())
         }
     }
+
     sort.Strings(files)
     sort.Strings(folders)
     return folders, files
 }
 
-func GetFiles(path string) ([]string, []string) {
-    return separateFilesAndFolders(path)
+func GetFiles(path string, showHidden bool) ([]string, []string) {
+    return separateFilesAndFolders(path, showHidden)
 }

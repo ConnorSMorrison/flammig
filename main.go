@@ -5,6 +5,7 @@ import (
     "os"
     // "fmt"
     "strings"
+    "slices"
     "os/exec"
     "github.com/rivo/tview"
     "github.com/gdamore/tcell/v2"
@@ -12,8 +13,27 @@ import (
     "path/filepath"
 )
 
-func setFiles(fileList *tview.List, absolutePath string, folders []string, fls []string) ([]string, []string) {
-    folders, fls = files.GetFiles(absolutePath)
+func findItem(fileList *tview.List, item string) int {
+    items := make([]string, 0)
+
+    for i := 0; i < fileList.GetItemCount(); i++ {
+        itemMain, _ := fileList.GetItemText(i)
+        items = append(items, itemMain)
+    }
+
+    idx := slices.Index(items, item)
+    return idx
+}
+
+func setFiles(fileList *tview.List, absolutePath string, folders []string, fls []string, showHidden bool) ([]string, []string) {
+    folders, fls = files.GetFiles(absolutePath, showHidden)
+
+    justMade := true
+    var currentItem string
+    if fileList.GetItemCount() > 0 {
+        currentItem, _ = fileList.GetItemText(fileList.GetCurrentItem())
+        justMade = false
+    }
     
     fileList.Clear()
     for _, folder := range folders {
@@ -23,7 +43,11 @@ func setFiles(fileList *tview.List, absolutePath string, folders []string, fls [
         fileList.AddItem(file, "", 0, nil)
     }
 
-    fileList.SetCurrentItem(0)
+    if !justMade {
+        if idx := findItem(fileList, currentItem); idx != -1 {
+            fileList.SetCurrentItem(idx)
+        }
+    }
 
     return folders, fls
 }
@@ -32,6 +56,7 @@ func main() {
     app := tview.NewApplication()
 
     absolutePath, _ := filepath.Abs(".")
+    showHidden := false
 
     flex := tview.NewFlex()
     flex.SetBorder(true)
@@ -40,10 +65,10 @@ func main() {
     flex.SetDirection(tview.FlexRow)
 
     fileList := tview.NewList().SetWrapAround(true).SetSelectedBackgroundColor(tcell.ColorGray)
-    folders, fls := files.GetFiles(".")
+    folders, fls := make([]string, 0), make([]string, 0)
     flex.AddItem(fileList, 0, 1, true)
 
-    folders, fls = setFiles(fileList, absolutePath, folders, fls)
+    folders, fls = setFiles(fileList, absolutePath, folders, fls, showHidden)
 
     app.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
         switch event.Key() {
@@ -52,7 +77,7 @@ func main() {
             case 'h':
             // go back
             absolutePath = path.Join(absolutePath, "..")
-            folders, fls = setFiles(fileList, absolutePath, folders, fls)
+            folders, fls = setFiles(fileList, absolutePath, folders, fls, showHidden)
             case 'l':
             // go into a selected folder or xdg-open file
             if len(folders) + len(fls) != 0 {
@@ -69,7 +94,7 @@ func main() {
                 mode := fl.Mode()
                 if mode.IsDir() {
                     absolutePath = filePath
-                    folders, fls = setFiles(fileList, absolutePath, folders, fls)
+                    folders, fls = setFiles(fileList, absolutePath, folders, fls, showHidden)
                 } else {
                     cmd := exec.Command("gio", "open", filePath)
                     cmd.Run()
@@ -87,6 +112,9 @@ func main() {
             case 'k':
             // go up
             fileList.SetCurrentItem(fileList.GetCurrentItem() - 1)
+            case 'g':
+            showHidden = !showHidden
+            folders, fls = setFiles(fileList, absolutePath, folders, fls, showHidden)
         }
         }
         return event
